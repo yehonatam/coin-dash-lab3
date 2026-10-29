@@ -54,5 +54,16 @@ window.COIN_DASH = {
     clydeRadiusPx: 200,   // Clyde: retreats to its corner when closer than this (~8 tiles)
     cornerMarginPx: 50,   // scatter corners and targets stay this far inside the arena
     tints: [0xff657a, 0xff9ad5, 0xffa94d, 0x6fd8ff] // Blinky, Pinky, Clyde, Inky
+  },
+
+  // --- shield: press the key for a short invulnerable window, then a long recharge ---
+  shield: {
+    activeSeconds: 3,     // how long the shield lasts; no coin pickup and no drone damage meanwhile
+    rechargeSeconds: 15,  // starts only once the shield effect has ended
+    radius: 26,           // ring around the player
+    barX: 530,            // same left edge/width as the boost bar, drawn just below it
+    barY: 37,
+    barWidth: 140,
+    colors: { back: 0x24334b, ready: 0x6fd8ff, active: 0xffffff, recharging: 0x5d7190 }
   }
 };

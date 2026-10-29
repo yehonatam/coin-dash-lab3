@@ -33,12 +33,14 @@ class CoinDash extends Phaser.Scene {
       drone.body.setVelocity(Math.cos(angle) * c.droneSpeed, Math.sin(angle) * c.droneSpeed);
     }
     this.physics.add.overlap(this.player, this.coin, () => {
-      if (this.finished) return;
+      if (this.finished || this.shieldActive) return; // the shield blocks coin pickup
       this.score++;
       this.onCoinCollected();
       this.placeCoin();
     });
-    this.physics.add.overlap(this.player, this.drones, () => this.finish('A drone caught you!'));
+    this.physics.add.overlap(this.player, this.drones, () => {
+      if (!this.shieldActive) this.finish('A drone caught you!');
+    });
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('W,A,S,D,R');
     this.input.keyboard.on('keydown-R', () => this.scene.restart({ mode: this.mode }));
@@ -48,6 +50,7 @@ class CoinDash extends Phaser.Scene {
     this.setupBoost();
     this.setupTimeBonus();
     this.setupChasers();
+    this.setupShield();
   }
 
   // ---- Shared interface used by every feature ------------------------------------------
@@ -118,6 +121,18 @@ class CoinDash extends Phaser.Scene {
     this.drawBoostBar();
   }
 
+  setupShield() {
+    const sh = COIN_DASH.shield;
+    this.shieldActive = false;
+    this.shieldMs = 0;          // time left in the current phase (active or recharging)
+    this.shieldRecharging = false;
+    this.shieldKey = this.input.keyboard.addKey('E');
+    this.add.rectangle(sh.barX, sh.barY, sh.barWidth, 6, sh.colors.back).setOrigin(0, 0.5);
+    this.shieldBar = this.add.rectangle(sh.barX, sh.barY, sh.barWidth, 6, sh.colors.ready).setOrigin(0, 0.5);
+    this.shieldRing = this.add.circle(0, 0, sh.radius, sh.colors.ready, 0.15)
+      .setStrokeStyle(3, sh.colors.active).setVisible(false);
+  }
+
   setupTimeBonus() {
     if (this.mode === 'survival') return; // no timer to extend
     const { everyCoins } = COIN_DASH.timeBonus;
@@ -152,6 +167,31 @@ class CoinDash extends Phaser.Scene {
     drone.personality = i % 4;
     drone.corner = corners[i % 4];
     drone.setFillStyle(c.tints[i % 4]);
+  }
+
+  /** Shield: E starts it when ready; it recharges only after the effect ends. Runs while `running`. */
+  updateShield(delta) {
+    const sh = COIN_DASH.shield;
+    if (!this.shieldActive && !this.shieldRecharging && Phaser.Input.Keyboard.JustDown(this.shieldKey)) {
+      this.shieldActive = true;
+      this.shieldMs = sh.activeSeconds * 1000;
+    }
+    if (this.shieldActive || this.shieldRecharging) {
+      this.shieldMs -= delta;
+      if (this.shieldMs <= 0 && this.shieldActive) {
+        this.shieldActive = false;
+        this.shieldRecharging = true;
+        this.shieldMs = sh.rechargeSeconds * 1000;
+      } else if (this.shieldMs <= 0) {
+        this.shieldRecharging = false;
+      }
+    }
+    this.shieldRing.setVisible(this.shieldActive).setPosition(this.player.x, this.player.y);
+    const full = this.shieldActive ? this.shieldMs / (sh.activeSeconds * 1000)
+      : this.shieldRecharging ? 1 - this.shieldMs / (sh.rechargeSeconds * 1000) : 1;
+    this.shieldBar.width = Math.max(0.01, sh.barWidth * full);
+    this.shieldBar.setFillStyle(this.shieldActive ? sh.colors.active
+      : this.shieldRecharging ? sh.colors.recharging : sh.colors.ready);
   }
 
   /** Called once per coin pickup, after the score is incremented. */
@@ -289,6 +329,7 @@ class CoinDash extends Phaser.Scene {
     this.updatePlayer();
     this.updateBoost(delta);
     this.updateChasers(delta);
+    this.updateShield(delta);
     const seconds = Math.ceil(this.remainingMs() / 1000);
     const parts = [`Coins: ${this.score}`, `Time: ${seconds}s`, ...this.hudItems.map((fn) => fn())];
     this.hud.setText(parts.filter(Boolean).join('    '));
@@ -415,6 +456,7 @@ class SurvivalScene extends CoinDash {
     this.updatePlayer();
     this.updateBoost(delta);
     this.updateChasers(delta);
+    this.updateShield(delta);
     const parts = [`Coins: ${this.score}`, `Survived: ${Math.floor(this.elapsedMs / 1000)}s`,
       `Drones: ${this.drones.getLength()}`, ...this.hudItems.map((fn) => fn())];
     this.hud.setText(parts.filter(Boolean).join('    '));
