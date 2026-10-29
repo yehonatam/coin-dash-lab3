@@ -10,7 +10,19 @@ window.COIN_DASH = {
   // One block per feature; each feature branch edits only its own block.
 
   // --- stop button ---
-  stop: {},
+  stop: {
+    buttonX: 738,
+    buttonY: 22,
+    buttonWidth: 100,
+    buttonHeight: 30,
+    buttonColor: 0x2a3a57,
+    buttonHoverColor: 0x3d5580,
+    stopLabel: 'Stop (P)',
+    resumeLabel: 'Resume (P)',
+    pausedText: 'PAUSED\nPress P to resume',
+    dimAlpha: 0.7,
+    depth: 10
+  },
 
   // --- boost ---
   boost: {},
