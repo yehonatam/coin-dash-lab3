@@ -95,7 +95,6 @@ class CoinDash extends Phaser.Scene {
     bg.on('pointerover', () => bg.setFillStyle(s.buttonHoverColor));
     bg.on('pointerout', () => bg.setFillStyle(s.buttonColor));
     this.input.keyboard.on('keydown-P', toggle);
-    this.input.keyboard.on('keydown-ESC', toggle);
     // The scene's event emitter survives scene.restart(), so unhook our listener on shutdown.
     const onPauseChanged = (paused) => {
       overlay.setVisible(paused);
