@@ -123,7 +123,26 @@ class CoinDash extends Phaser.Scene {
     this.addHudItem(() => `Bonus in ${everyCoins - (this.score % everyCoins)}`);
   }
 
-  setupChasers() {}
+  setupChasers() {
+    const c = COIN_DASH.chasers;
+    this.chaserMode = 'chase';
+    this.chaserModeMs = 0;
+    this.chaserFacing = new Phaser.Math.Vector2(0, -1);
+    const m = c.cornerMarginPx;
+    const top = 44 + m;
+    const corners = [
+      new Phaser.Math.Vector2(COIN_DASH.width - m, top),
+      new Phaser.Math.Vector2(m, top),
+      new Phaser.Math.Vector2(m, COIN_DASH.height - m),
+      new Phaser.Math.Vector2(COIN_DASH.width - m, COIN_DASH.height - m)
+    ];
+    // Personality by index: 0 Blinky, 1 Pinky, 2 Clyde, 3 Inky (any further drones repeat).
+    this.drones.getChildren().forEach((drone, i) => {
+      drone.personality = i % 4;
+      drone.corner = corners[i % 4];
+      drone.setFillStyle(c.tints[i % 4]);
+    });
+  }
 
   /** Called once per coin pickup, after the score is incremented. */
   onCoinCollected() {
@@ -167,7 +186,77 @@ class CoinDash extends Phaser.Scene {
     this.player.setFillStyle(this.boosting ? b.colors.active : COIN_DASH.colors.player);
   }
 
-  updateChasers(delta) {} // eslint-disable-line no-unused-vars
+  updateChasers(delta) {
+    const c = COIN_DASH.chasers;
+    // Mode cycle runs on accumulated game time, so it freezes while paused.
+    this.chaserModeMs += delta;
+    const phaseMs = (this.chaserMode === 'chase' ? c.chaseSeconds : c.scatterSeconds) * 1000;
+    if (this.chaserModeMs >= phaseMs) {
+      this.chaserModeMs -= phaseMs;
+      this.chaserMode = this.chaserMode === 'chase' ? 'scatter' : 'chase';
+    }
+    const player = this.player;
+    if (player.body.velocity.lengthSq() > 1) {
+      this.chaserFacing.copy(player.body.velocity).normalize();
+    }
+    const drones = this.drones.getChildren();
+    const maxTurn = Phaser.Math.DegToRad(c.turnRateDegPerSec) * Math.min(delta, 100) / 1000;
+    drones.forEach((drone) => {
+      const target = this.chaserTarget(drone, drones[0]);
+      this.steerChaser(drone, target, maxTurn);
+    });
+  }
+
+  /** Point a drone is heading for, from its personality and the current mode. */
+  chaserTarget(drone, blinky) {
+    const c = COIN_DASH.chasers;
+    const player = this.player;
+    const facing = this.chaserFacing;
+    if (this.chaserMode === 'scatter') return drone.corner;
+    const target = new Phaser.Math.Vector2(player.x, player.y);
+    if (drone.personality === 1) {
+      target.add(facing.clone().scale(c.aheadPx));
+    } else if (drone.personality === 2) {
+      const near = Phaser.Math.Distance.Between(drone.x, drone.y, player.x, player.y) < c.clydeRadiusPx;
+      if (near) return drone.corner;
+    } else if (drone.personality === 3) {
+      const pivot = target.clone().add(facing.clone().scale(c.inkyPivotPx));
+      target.set(pivot.x * 2 - blinky.x, pivot.y * 2 - blinky.y);
+    }
+    // Keep aim points inside the arena so drones do not press against the walls.
+    const m = c.cornerMarginPx;
+    target.x = Phaser.Math.Clamp(target.x, m, COIN_DASH.width - m);
+    target.y = Phaser.Math.Clamp(target.y, 44 + m, COIN_DASH.height - m);
+    return target;
+  }
+
+  /** Turn the drone's velocity toward `target` by at most `maxTurn` radians, at a steady speed. */
+  steerChaser(drone, target, maxTurn) {
+    const body = drone.body;
+    const speed = COIN_DASH.droneSpeed * COIN_DASH.chasers.speedMultiplier;
+    const wanted = Math.atan2(target.y - drone.y, target.x - drone.x);
+    let angle = wanted;
+    if (body.velocity.lengthSq() > 1) {
+      const current = Math.atan2(body.velocity.y, body.velocity.x);
+      angle = current + Phaser.Math.Clamp(Phaser.Math.Angle.Wrap(wanted - current), -maxTurn, maxTurn);
+    }
+    let vx = Math.cos(angle) * speed;
+    let vy = Math.sin(angle) * speed;
+    // Slide along a wall instead of pushing into it; in a corner, slide toward the target.
+    const b = body.blocked;
+    if ((b.left && vx < 0) || (b.right && vx > 0)) vx = 0;
+    if ((b.up && vy < 0) || (b.down && vy > 0)) vy = 0;
+    if (vx === 0 && vy === 0) {
+      vx = (b.left || b.right) ? 0 : Math.sign(target.x - drone.x) * speed;
+      vy = (b.up || b.down) ? 0 : Math.sign(target.y - drone.y) * speed;
+      if (vx === 0 && vy === 0) vy = (b.up ? 1 : -1) * speed;
+    } else {
+      const scale = speed / Math.hypot(vx, vy);
+      vx *= scale;
+      vy *= scale;
+    }
+    body.setVelocity(vx, vy);
+  }
 
   // ---- Core game ----------------------------------------------------------------------
   placeCoin() {
