@@ -6,7 +6,11 @@ class CoinDash extends Phaser.Scene {
     const c = COIN_DASH;
     this.score = 0;
     this.finished = false;
-    this.deadline = this.time.now + c.roundSeconds * 1000;
+    this.paused = false;
+    this.elapsedMs = 0;
+    this.roundMs = c.roundSeconds * 1000;
+    this.speedMultiplier = 1;
+    this.hudItems = [];
     this.physics.world.setBounds(0, 44, c.width, c.height - 44);
     this.add.grid(c.width / 2, c.height / 2, c.width, c.height, 40, 40,
       c.colors.background, 1, 0x24334b, 0.45);
@@ -29,14 +33,64 @@ class CoinDash extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.coin, () => {
       if (this.finished) return;
       this.score++;
+      this.onCoinCollected();
       this.placeCoin();
     });
     this.physics.add.overlap(this.player, this.drones, () => this.finish('A drone caught you!'));
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('W,A,S,D,R');
     this.input.keyboard.on('keydown-R', () => this.scene.restart());
+    // One setup method per feature; each feature branch fills in only its own.
+    this.setupStop();
+    this.setupBoost();
+    this.setupTimeBonus();
+    this.setupChasers();
   }
 
+  // ---- Shared interface used by every feature ------------------------------------------
+  // Game time only advances while running, so anything driven by `delta` (boost charge,
+  // the round timer, chaser logic) freezes automatically while the game is paused.
+
+  /** True while the round is live: not finished and not paused. */
+  get running() { return !this.finished && !this.paused; }
+
+  /** Pause (true) or resume (false). Freezes physics; update() stops advancing game time. */
+  setPaused(paused) {
+    if (this.finished || this.paused === paused) return;
+    this.paused = paused;
+    if (paused) this.physics.pause(); else this.physics.resume();
+    this.events.emit('pause-changed', paused);
+  }
+
+  togglePause() { this.setPaused(!this.paused); }
+
+  /** Milliseconds left in the round. */
+  remainingMs() { return Math.max(0, this.roundMs - this.elapsedMs); }
+
+  /** Extend (or shorten) the round by `ms` milliseconds. */
+  addTime(ms) { this.roundMs += ms; }
+
+  /** Register a function returning a short string to show in the HUD, e.g. () => `Boost: 80%`. */
+  addHudItem(fn) { this.hudItems.push(fn); }
+
+  // ---- Feature hooks (empty here; each feature branch implements its own) --------------
+  setupStop() {}
+
+  setupBoost() {}
+
+  setupTimeBonus() {}
+
+  setupChasers() {}
+
+  /** Called once per coin pickup, after the score is incremented. */
+  onCoinCollected() {}
+
+  /** Per-frame hooks, called only while `running`. `delta` is in milliseconds. */
+  updateBoost(delta) {} // eslint-disable-line no-unused-vars
+
+  updateChasers(delta) {} // eslint-disable-line no-unused-vars
+
+  // ---- Core game ----------------------------------------------------------------------
   placeCoin() {
     const c = COIN_DASH;
     // Avoid spawning the next coin directly underneath the player.
@@ -49,17 +103,26 @@ class CoinDash extends Phaser.Scene {
     this.coin.body.reset(x, y);
   }
 
-  update() {
-    if (this.finished) return;
+  update(time, delta) {
+    if (!this.running) return;
+    this.elapsedMs += delta;
+    this.updatePlayer();
+    this.updateBoost(delta);
+    this.updateChasers(delta);
+    const seconds = Math.ceil(this.remainingMs() / 1000);
+    const parts = [`Coins: ${this.score}`, `Time: ${seconds}s`, ...this.hudItems.map((fn) => fn())];
+    this.hud.setText(parts.filter(Boolean).join('    '));
+    if (seconds === 0) this.finish('Time is up!');
+  }
+
+  updatePlayer() {
     const dx = Number(this.cursors.right.isDown || this.keys.D.isDown)
       - Number(this.cursors.left.isDown || this.keys.A.isDown);
     const dy = Number(this.cursors.down.isDown || this.keys.S.isDown)
       - Number(this.cursors.up.isDown || this.keys.W.isDown);
-    const direction = new Phaser.Math.Vector2(dx, dy).normalize().scale(COIN_DASH.playerSpeed);
+    const speed = COIN_DASH.playerSpeed * this.speedMultiplier;
+    const direction = new Phaser.Math.Vector2(dx, dy).normalize().scale(speed);
     this.player.body.setVelocity(direction.x, direction.y);
-    const seconds = Math.max(0, Math.ceil((this.deadline - this.time.now) / 1000));
-    this.hud.setText(`Coins: ${this.score}                       Time: ${seconds}s`);
-    if (seconds === 0) this.finish('Time is up!');
   }
 
   finish(reason) {
