@@ -19,5 +19,15 @@ window.COIN_DASH = {
   timeBonus: {},
 
   // --- smarter chasers ---
-  chasers: {}
+  chasers: {
+    chaseSeconds: 15,     // length of each chase phase
+    scatterSeconds: 5,    // length of each scatter phase (drones head for their corners)
+    speedMultiplier: 1.1, // times droneSpeed; stays far below playerSpeed
+    turnRateDegPerSec: 150, // max steering rate, so drones curve instead of snapping
+    aheadPx: 160,         // Pinky: how far ahead of the player to aim (~4 tiles)
+    inkyPivotPx: 80,      // Inky: pivot point ahead of the player (~2 tiles)
+    clydeRadiusPx: 200,   // Clyde: retreats to its corner when closer than this (~8 tiles)
+    cornerMarginPx: 50,   // scatter corners and targets stay this far inside the arena
+    tints: [0xff657a, 0xff9ad5, 0xffa94d, 0x6fd8ff] // Blinky, Pinky, Clyde, Inky
+  }
 };
