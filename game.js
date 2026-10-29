@@ -78,12 +78,29 @@ class CoinDash extends Phaser.Scene {
 
   setupBoost() {}
 
-  setupTimeBonus() {}
+  setupTimeBonus() {
+    const { everyCoins } = COIN_DASH.timeBonus;
+    this.addHudItem(() => `Bonus in ${everyCoins - (this.score % everyCoins)}`);
+  }
 
   setupChasers() {}
 
   /** Called once per coin pickup, after the score is incremented. */
-  onCoinCollected() {}
+  onCoinCollected() {
+    const { everyCoins, seconds } = COIN_DASH.timeBonus;
+    if (this.score % everyCoins !== 0) return;
+    this.addTime(seconds * 1000);
+    // Cosmetic floating label; the tween is not gameplay logic.
+    const label = this.add.text(this.player.x, this.player.y - 24, `+${seconds}s`,
+      { font: '22px monospace', color: '#ffd166' }).setOrigin(0.5);
+    this.tweens.add({
+      targets: label,
+      y: label.y - 50,
+      alpha: 0,
+      duration: 900,
+      onComplete: () => label.destroy()
+    });
+  }
 
   /** Per-frame hooks, called only while `running`. `delta` is in milliseconds. */
   updateBoost(delta) {} // eslint-disable-line no-unused-vars
