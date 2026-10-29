@@ -76,7 +76,16 @@ class CoinDash extends Phaser.Scene {
   // ---- Feature hooks (empty here; each feature branch implements its own) --------------
   setupStop() {}
 
-  setupBoost() {}
+  setupBoost() {
+    const b = COIN_DASH.boost;
+    this.boostCharge = b.startCharge;
+    this.boosting = false;
+    this.boostKeys = this.input.keyboard.addKeys('SPACE,SHIFT');
+    const x = COIN_DASH.width - b.barWidth - 18;
+    this.add.rectangle(x, 22, b.barWidth, 12, b.colors.back).setOrigin(0, 0.5);
+    this.boostBar = this.add.rectangle(x, 22, b.barWidth, 12, b.colors.fill).setOrigin(0, 0.5);
+    this.drawBoostBar();
+  }
 
   setupTimeBonus() {}
 
@@ -86,7 +95,29 @@ class CoinDash extends Phaser.Scene {
   onCoinCollected() {}
 
   /** Per-frame hooks, called only while `running`. `delta` is in milliseconds. */
-  updateBoost(delta) {} // eslint-disable-line no-unused-vars
+  updateBoost(delta) {
+    const b = COIN_DASH.boost;
+    const wanted = this.boostKeys.SPACE.isDown || this.boostKeys.SHIFT.isDown;
+    // Starting needs a minimum charge; once started it lasts until the bar is empty.
+    if (!wanted) this.boosting = false;
+    else if (!this.boosting && this.boostCharge >= b.minToStart) this.boosting = true;
+    if (this.boosting) {
+      this.boostCharge = Math.max(0, this.boostCharge - delta / (b.drainSeconds * 1000));
+      if (this.boostCharge === 0) this.boosting = false;
+    } else {
+      this.boostCharge = Math.min(1, this.boostCharge + delta / (b.chargeSeconds * 1000));
+    }
+    this.speedMultiplier = this.boosting ? b.speedMultiplier : 1;
+    this.drawBoostBar();
+  }
+
+  drawBoostBar() {
+    const b = COIN_DASH.boost;
+    this.boostBar.width = Math.max(0.01, b.barWidth * this.boostCharge);
+    this.boostBar.setFillStyle(this.boosting ? b.colors.active
+      : this.boostCharge < b.minToStart ? b.colors.low : b.colors.fill);
+    this.player.setFillStyle(this.boosting ? b.colors.active : COIN_DASH.colors.player);
+  }
 
   updateChasers(delta) {} // eslint-disable-line no-unused-vars
 
