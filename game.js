@@ -129,11 +129,17 @@ class CoinDash extends Phaser.Scene {
     this.chaserModeMs = 0;
     this.chaserFacing = new Phaser.Math.Vector2(0, -1);
     this.drones.getChildren().forEach((drone, i) => this.initChaser(drone, i));
+    // Extra (plain bouncing) drones knock the coin away if they touch it; chasers leave it alone.
+    this.physics.add.overlap(this.coin, this.drones, (coin, drone) => {
+      if (this.finished || drone.personality >= 0) return;
+      this.placeCoin();
+    });
   }
 
   /** Give a drone its personality, scatter corner and tint; also used for drones added later. */
   initChaser(drone, i) {
     const c = COIN_DASH.chasers;
+    if (i >= c.chaserCount) { drone.personality = -1; return; } // plain bouncer, original behaviour
     const m = c.cornerMarginPx;
     const top = 44 + m;
     const corners = [
@@ -207,6 +213,7 @@ class CoinDash extends Phaser.Scene {
     const maxTurn = Phaser.Math.DegToRad(c.turnRateDegPerSec) * Math.min(delta, 100) / 1000;
     drones.forEach((drone, i) => {
       if (drone.personality === undefined) this.initChaser(drone, i);
+      if (drone.personality < 0) return;
       const target = this.chaserTarget(drone, drones[0]);
       this.steerChaser(drone, target, maxTurn);
     });

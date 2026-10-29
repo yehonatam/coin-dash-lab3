@@ -44,6 +44,7 @@ window.COIN_DASH = {
 
   // --- smarter chasers ---
   chasers: {
+    chaserCount: 3,       // drones beyond this many keep the original bouncing and knock the coin away
     chaseSeconds: 15,     // length of each chase phase
     scatterSeconds: 5,    // length of each scatter phase (drones head for their corners)
     speedMultiplier: 1.1, // times droneSpeed; stays far below playerSpeed
