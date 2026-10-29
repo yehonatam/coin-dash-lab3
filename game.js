@@ -64,6 +64,8 @@ class CoinDash extends Phaser.Scene {
   setPaused(paused) {
     if (this.finished || this.paused === paused) return;
     this.paused = paused;
+    // A shield press made while paused counts only if E is still held at resume (see updateShield).
+    if (!paused) this.shieldPressed = this.shieldPressed && this.shieldKey.isDown;
     if (paused) this.physics.pause(); else this.physics.resume();
     this.events.emit('pause-changed', paused);
   }
@@ -97,6 +99,7 @@ class CoinDash extends Phaser.Scene {
     const label = this.add.text(s.buttonX, s.buttonY, s.stopLabel,
       { font: '16px monospace', color: '#ffffff' }).setOrigin(0.5).setDepth(s.depth + 1);
     const toggle = () => { if (!this.finished) this.togglePause(); };
+    this.stopButton = [bg, label]; // finish() dims them
     bg.on('pointerdown', toggle);
     bg.on('pointerover', () => bg.setFillStyle(s.buttonHoverColor));
     bg.on('pointerout', () => bg.setFillStyle(s.buttonColor));
@@ -127,10 +130,18 @@ class CoinDash extends Phaser.Scene {
     this.shieldMs = 0;          // time left in the current phase (active or recharging)
     this.shieldRecharging = false;
     this.shieldKey = this.input.keyboard.addKey('E');
+    this.shieldPressed = false; // a genuine (non-repeat) E keydown not yet handled by updateShield
+    // Only a real keydown counts: auto-repeat from a key held before this scene started
+    // (restart, menu) has repeat === true. Scene keyboard listeners are dropped on shutdown.
+    this.input.keyboard.on('keydown-E', (event) => { if (!event.repeat) this.shieldPressed = true; });
     this.add.rectangle(sh.barX, sh.barY, sh.barWidth, 6, sh.colors.back).setOrigin(0, 0.5);
     this.shieldBar = this.add.rectangle(sh.barX, sh.barY, sh.barWidth, 6, sh.colors.ready).setOrigin(0, 0.5);
     this.shieldRing = this.add.circle(0, 0, sh.radius, sh.colors.ready, 0.15)
       .setStrokeStyle(3, sh.colors.active).setVisible(false);
+    // Arcade moves the player in its post-update, so place the ring after that to avoid a frame of lag.
+    const onPostUpdate = () => this.shieldRing.setPosition(this.player.x, this.player.y);
+    this.events.on('postupdate', onPostUpdate);
+    this.events.once('shutdown', () => this.events.off('postupdate', onPostUpdate));
   }
 
   setupTimeBonus() {
@@ -169,10 +180,16 @@ class CoinDash extends Phaser.Scene {
     drone.setFillStyle(c.tints[i % 4]);
   }
 
-  /** Shield: E starts it when ready and ends it early; recharge starts only once it has ended. */
+  /**
+   * Shield: E starts it when ready and ends it early; recharge starts only once it has ended.
+   * A press is a non-repeat keydown, handled once. While paused it waits: at resume it counts
+   * as one press only if E is still held (setPaused); a tap released during the pause is dropped.
+   */
   updateShield(delta) {
+    if (this.finished) return;
     const sh = COIN_DASH.shield;
-    const pressed = Phaser.Input.Keyboard.JustDown(this.shieldKey);
+    const pressed = this.shieldPressed;
+    this.shieldPressed = false;
     if (this.shieldActive) {
       this.shieldMs -= delta;
       if (pressed || this.shieldMs <= 0) {
@@ -187,6 +204,11 @@ class CoinDash extends Phaser.Scene {
       this.shieldActive = true;
       this.shieldMs = sh.activeSeconds * 1000;
     }
+    this.drawShield();
+  }
+
+  drawShield() {
+    const sh = COIN_DASH.shield;
     this.shieldRing.setVisible(this.shieldActive).setPosition(this.player.x, this.player.y);
     const full = this.shieldActive ? this.shieldMs / (sh.activeSeconds * 1000)
       : this.shieldRecharging ? 1 - this.shieldMs / (sh.rechargeSeconds * 1000) : 1;
@@ -352,6 +374,17 @@ class CoinDash extends Phaser.Scene {
     if (this.finished) return;
     this.finished = true;
     this.physics.pause();
+    if (this.shieldActive) { // the shield ends with the round: no ring on the game-over screen
+      this.shieldActive = false;
+      this.shieldRecharging = true;
+      this.shieldMs = COIN_DASH.shield.rechargeSeconds * 1000;
+    }
+    this.shieldPressed = false;
+    this.drawShield();
+    // The Stop button does nothing now: dim it and stop it reacting.
+    const [stopBg, stopLabel] = this.stopButton;
+    stopBg.disableInteractive().setFillStyle(COIN_DASH.stop.buttonColor).setAlpha(0.35);
+    stopLabel.setAlpha(0.35);
     const c = COIN_DASH;
     this.add.rectangle(c.width / 2, c.height / 2, 460, 150, 0x0a1120, 0.95);
     this.add.text(c.width / 2, c.height / 2,
