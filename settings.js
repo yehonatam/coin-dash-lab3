@@ -32,6 +32,7 @@ window.COIN_DASH = {
     minToStart: 0.2,      // charge fraction needed to begin a boost
     speedMultiplier: 1.8,
     barWidth: 140,
+    barX: 530,            // left edge of the bar; leaves room for the Stop button at the right
     colors: { back: 0x24334b, fill: 0x71e8ce, active: 0xffd166, low: 0xff657a }
   },
 

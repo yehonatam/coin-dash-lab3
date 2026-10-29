@@ -112,7 +112,7 @@ class CoinDash extends Phaser.Scene {
     this.boostCharge = b.startCharge;
     this.boosting = false;
     this.boostKeys = this.input.keyboard.addKeys('SPACE,SHIFT');
-    const x = COIN_DASH.width - b.barWidth - 18;
+    const x = b.barX;
     this.add.rectangle(x, 22, b.barWidth, 12, b.colors.back).setOrigin(0, 0.5);
     this.boostBar = this.add.rectangle(x, 22, b.barWidth, 12, b.colors.fill).setOrigin(0, 0.5);
     this.drawBoostBar();
