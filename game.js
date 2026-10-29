@@ -1,6 +1,6 @@
 /* global Phaser, COIN_DASH */
 class CoinDash extends Phaser.Scene {
-  constructor() { super('CoinDash'); }
+  constructor(key = 'CoinDash') { super(key); }
 
   init(data) { this.mode = (data && data.mode) || 'timer'; }
 
@@ -143,7 +143,7 @@ class CoinDash extends Phaser.Scene {
 /** Home screen: pick a game mode. Add new modes to GAME_MODES. */
 const GAME_MODES = [
   { id: 'timer', label: 'Timer', desc: 'Collect as many coins as you can before time runs out.', scene: 'CoinDash' },
-  { id: 'survival', label: 'Survival', desc: 'Coming soon: last as long as you can.', scene: 'Survival' }
+  { id: 'survival', label: 'Survival', desc: 'No timer. Drones speed up and multiply as you collect. Last as long as you can.', scene: 'Survival' }
 ];
 
 class MenuScene extends Phaser.Scene {
@@ -193,17 +193,58 @@ class MenuScene extends Phaser.Scene {
   }
 }
 
-/** Survival mode skeleton: to be developed. Receives { mode: 'survival' } from the menu. */
-class SurvivalScene extends Phaser.Scene {
+/**
+ * Survival mode: no time limit, the round ends when a drone catches you. Every `speedEvery`
+ * coins the drones get faster, every `addEvery` coins another one joins (up to `maxDrones`).
+ */
+class SurvivalScene extends CoinDash {
   constructor() { super('Survival'); }
 
   create() {
+    this.droneSpeedMult = 1;
+    super.create();
+  }
+
+  /** Drone count and speed for the current score, from the settings.survival tuning block. */
+  onCoinCollected() {
+    const s = COIN_DASH.survival;
+    const mult = 1 + Math.floor(this.score / s.speedEvery) * s.speedStep;
+    if (mult !== this.droneSpeedMult) {
+      const ratio = mult / this.droneSpeedMult;
+      this.droneSpeedMult = mult;
+      this.drones.getChildren().forEach((d) => d.body.velocity.scale(ratio));
+    }
+    const wanted = Math.min(s.maxDrones, COIN_DASH.droneCount + Math.floor(this.score / s.addEvery));
+    while (this.drones.getLength() < wanted) this.spawnDrone();
+  }
+
+  /** Add a drone away from the player, moving in a random direction at the current speed. */
+  spawnDrone() {
     const c = COIN_DASH;
-    this.add.grid(c.width / 2, c.height / 2, c.width, c.height, 40, 40,
-      c.colors.background, 1, 0x24334b, 0.45);
-    this.add.text(c.width / 2, c.height / 2, 'SURVIVAL\n\nWork in progress\n\nESC: menu',
-      { font: '24px monospace', color: '#ffffff', align: 'center' }).setOrigin(0.5);
-    this.input.keyboard.on('keydown-ESC', () => this.scene.start('Menu'));
+    let x, y;
+    do {
+      x = Phaser.Math.Between(25, c.width - 25);
+      y = Phaser.Math.Between(70, c.height - 25);
+    } while (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 200);
+    const drone = this.add.rectangle(x, y, 26, 26, c.colors.drone);
+    this.drones.add(drone);
+    drone.body.setCollideWorldBounds(true).setBounce(1, 1);
+    this.physics.velocityFromAngle(Phaser.Math.Between(0, 359), c.droneSpeed * this.droneSpeedMult, drone.body.velocity);
+  }
+
+  update(time, delta) {
+    if (!this.running) return;
+    this.elapsedMs += delta;
+    this.updatePlayer();
+    this.updateBoost(delta);
+    this.updateChasers(delta);
+    const parts = [`Coins: ${this.score}`, `Survived: ${Math.floor(this.elapsedMs / 1000)}s`,
+      `Drones: ${this.drones.getLength()}`, ...this.hudItems.map((fn) => fn())];
+    this.hud.setText(parts.filter(Boolean).join('    '));
+  }
+
+  finish(reason) {
+    super.finish(`${reason} (${Math.floor(this.elapsedMs / 1000)}s)`);
   }
 }
 
