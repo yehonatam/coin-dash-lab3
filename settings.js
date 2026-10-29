@@ -36,7 +36,7 @@ window.COIN_DASH = {
   },
 
   // --- coin time bonus ---
-  timeBonus: {},
+  timeBonus: { everyCoins: 10, seconds: 10 },
 
   // --- smarter chasers ---
   chasers: {}
