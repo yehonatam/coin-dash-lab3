@@ -2,6 +2,8 @@
 class CoinDash extends Phaser.Scene {
   constructor() { super('CoinDash'); }
 
+  init(data) { this.mode = (data && data.mode) || 'timer'; }
+
   create() {
     const c = COIN_DASH;
     this.score = 0;
@@ -39,7 +41,8 @@ class CoinDash extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.drones, () => this.finish('A drone caught you!'));
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('W,A,S,D,R');
-    this.input.keyboard.on('keydown-R', () => this.scene.restart());
+    this.input.keyboard.on('keydown-R', () => this.scene.restart({ mode: this.mode }));
+    this.input.keyboard.on('keydown-ESC', () => this.scene.start('Menu'));
     // One setup method per feature; each feature branch fills in only its own.
     this.setupStop();
     this.setupBoost();
@@ -132,11 +135,78 @@ class CoinDash extends Phaser.Scene {
     const c = COIN_DASH;
     this.add.rectangle(c.width / 2, c.height / 2, 460, 150, 0x0a1120, 0.95);
     this.add.text(c.width / 2, c.height / 2,
-      `${reason}\n${this.score} coins collected\nPress R to try again`,
+      `${reason}\n${this.score} coins collected\nR: try again    ESC: menu`,
       { font: '24px monospace', color: '#ffffff', align: 'center', lineSpacing: 12 }
     ).setOrigin(0.5);
   }
 }
+/** Home screen: pick a game mode. Add new modes to GAME_MODES. */
+const GAME_MODES = [
+  { id: 'timer', label: 'Timer', desc: 'Collect as many coins as you can before time runs out.', scene: 'CoinDash' },
+  { id: 'survival', label: 'Survival', desc: 'Coming soon: last as long as you can.', scene: 'Survival' }
+];
+
+class MenuScene extends Phaser.Scene {
+  constructor() { super('Menu'); }
+
+  create() {
+    const c = COIN_DASH;
+    this.selected = 0;
+    this.add.grid(c.width / 2, c.height / 2, c.width, c.height, 40, 40,
+      c.colors.background, 1, 0x24334b, 0.45);
+    this.add.text(c.width / 2, 90, 'COIN DASH', { font: 'bold 48px monospace', color: '#71e8ce' }).setOrigin(0.5);
+    this.add.text(c.width / 2, 140, 'Choose a game mode', { font: '18px monospace', color: '#9fb3cc' }).setOrigin(0.5);
+    this.items = GAME_MODES.map((mode, i) => {
+      const text = this.add.text(c.width / 2, 220 + i * 70, mode.label,
+        { font: '28px monospace', color: '#ffffff' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      text.on('pointerover', () => this.select(i));
+      text.on('pointerdown', () => this.start(i));
+      return text;
+    });
+    this.desc = this.add.text(c.width / 2, c.height - 70, '',
+      { font: '16px monospace', color: '#9fb3cc' }).setOrigin(0.5);
+    this.add.text(c.width / 2, c.height - 30, 'Up/Down or W/S to choose · Enter/Space to play',
+      { font: '14px monospace', color: '#5d7190' }).setOrigin(0.5);
+    const kb = this.input.keyboard;
+    kb.on('keydown-UP', () => this.select(this.selected - 1));
+    kb.on('keydown-W', () => this.select(this.selected - 1));
+    kb.on('keydown-DOWN', () => this.select(this.selected + 1));
+    kb.on('keydown-S', () => this.select(this.selected + 1));
+    kb.on('keydown-ENTER', () => this.start(this.selected));
+    kb.on('keydown-SPACE', () => this.start(this.selected));
+    this.select(0);
+  }
+
+  select(i) {
+    this.selected = Phaser.Math.Wrap(i, 0, GAME_MODES.length);
+    this.items.forEach((t, n) => {
+      const on = n === this.selected;
+      t.setText(`${on ? '> ' : '  '}${GAME_MODES[n].label}${on ? ' <' : '  '}`);
+      t.setColor(on ? '#ffd166' : '#ffffff');
+    });
+    this.desc.setText(GAME_MODES[this.selected].desc);
+  }
+
+  start(i) {
+    const mode = GAME_MODES[i];
+    this.scene.start(mode.scene, { mode: mode.id });
+  }
+}
+
+/** Survival mode skeleton: to be developed. Receives { mode: 'survival' } from the menu. */
+class SurvivalScene extends Phaser.Scene {
+  constructor() { super('Survival'); }
+
+  create() {
+    const c = COIN_DASH;
+    this.add.grid(c.width / 2, c.height / 2, c.width, c.height, 40, 40,
+      c.colors.background, 1, 0x24334b, 0.45);
+    this.add.text(c.width / 2, c.height / 2, 'SURVIVAL\n\nWork in progress\n\nESC: menu',
+      { font: '24px monospace', color: '#ffffff', align: 'center' }).setOrigin(0.5);
+    this.input.keyboard.on('keydown-ESC', () => this.scene.start('Menu'));
+  }
+}
+
 window.coinDashGame = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
@@ -145,5 +215,5 @@ window.coinDashGame = new Phaser.Game({
   backgroundColor: COIN_DASH.colors.background,
   physics: { default: 'arcade', arcade: { debug: false } },
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
-  scene: CoinDash
+  scene: [MenuScene, CoinDash, SurvivalScene]
 });
