@@ -119,15 +119,21 @@ class CoinDash extends Phaser.Scene {
   }
 
   setupTimeBonus() {
+    if (this.mode === 'survival') return; // no timer to extend
     const { everyCoins } = COIN_DASH.timeBonus;
     this.addHudItem(() => `Bonus in ${everyCoins - (this.score % everyCoins)}`);
   }
 
   setupChasers() {
-    const c = COIN_DASH.chasers;
     this.chaserMode = 'chase';
     this.chaserModeMs = 0;
     this.chaserFacing = new Phaser.Math.Vector2(0, -1);
+    this.drones.getChildren().forEach((drone, i) => this.initChaser(drone, i));
+  }
+
+  /** Give a drone its personality, scatter corner and tint; also used for drones added later. */
+  initChaser(drone, i) {
+    const c = COIN_DASH.chasers;
     const m = c.cornerMarginPx;
     const top = 44 + m;
     const corners = [
@@ -137,11 +143,9 @@ class CoinDash extends Phaser.Scene {
       new Phaser.Math.Vector2(COIN_DASH.width - m, COIN_DASH.height - m)
     ];
     // Personality by index: 0 Blinky, 1 Pinky, 2 Clyde, 3 Inky (any further drones repeat).
-    this.drones.getChildren().forEach((drone, i) => {
-      drone.personality = i % 4;
-      drone.corner = corners[i % 4];
-      drone.setFillStyle(c.tints[i % 4]);
-    });
+    drone.personality = i % 4;
+    drone.corner = corners[i % 4];
+    drone.setFillStyle(c.tints[i % 4]);
   }
 
   /** Called once per coin pickup, after the score is incremented. */
@@ -201,7 +205,8 @@ class CoinDash extends Phaser.Scene {
     }
     const drones = this.drones.getChildren();
     const maxTurn = Phaser.Math.DegToRad(c.turnRateDegPerSec) * Math.min(delta, 100) / 1000;
-    drones.forEach((drone) => {
+    drones.forEach((drone, i) => {
+      if (drone.personality === undefined) this.initChaser(drone, i);
       const target = this.chaserTarget(drone, drones[0]);
       this.steerChaser(drone, target, maxTurn);
     });
@@ -233,7 +238,7 @@ class CoinDash extends Phaser.Scene {
   /** Turn the drone's velocity toward `target` by at most `maxTurn` radians, at a steady speed. */
   steerChaser(drone, target, maxTurn) {
     const body = drone.body;
-    const speed = COIN_DASH.droneSpeed * COIN_DASH.chasers.speedMultiplier;
+    const speed = COIN_DASH.droneSpeed * COIN_DASH.chasers.speedMultiplier * (this.droneSpeedMult || 1);
     const wanted = Math.atan2(target.y - drone.y, target.x - drone.x);
     let angle = wanted;
     if (body.velocity.lengthSq() > 1) {
