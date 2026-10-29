@@ -60,6 +60,7 @@ window.COIN_DASH = {
   shield: {
     activeSeconds: 3,     // how long the shield lasts; no coin pickup and no drone damage meanwhile
     rechargeSeconds: 15,  // starts only once the shield effect has ended
+    allowBoost: true,     // false: boost is disabled while the shield is up
     radius: 26,           // ring around the player
     barX: 530,            // same left edge/width as the boost bar, drawn just below it
     barY: 37,

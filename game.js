@@ -169,22 +169,23 @@ class CoinDash extends Phaser.Scene {
     drone.setFillStyle(c.tints[i % 4]);
   }
 
-  /** Shield: E starts it when ready; it recharges only after the effect ends. Runs while `running`. */
+  /** Shield: E starts it when ready and ends it early; recharge starts only once it has ended. */
   updateShield(delta) {
     const sh = COIN_DASH.shield;
-    if (!this.shieldActive && !this.shieldRecharging && Phaser.Input.Keyboard.JustDown(this.shieldKey)) {
-      this.shieldActive = true;
-      this.shieldMs = sh.activeSeconds * 1000;
-    }
-    if (this.shieldActive || this.shieldRecharging) {
+    const pressed = Phaser.Input.Keyboard.JustDown(this.shieldKey);
+    if (this.shieldActive) {
       this.shieldMs -= delta;
-      if (this.shieldMs <= 0 && this.shieldActive) {
+      if (pressed || this.shieldMs <= 0) {
         this.shieldActive = false;
         this.shieldRecharging = true;
         this.shieldMs = sh.rechargeSeconds * 1000;
-      } else if (this.shieldMs <= 0) {
-        this.shieldRecharging = false;
       }
+    } else if (this.shieldRecharging) {
+      this.shieldMs -= delta;
+      if (this.shieldMs <= 0) this.shieldRecharging = false;
+    } else if (pressed) {
+      this.shieldActive = true;
+      this.shieldMs = sh.activeSeconds * 1000;
     }
     this.shieldRing.setVisible(this.shieldActive).setPosition(this.player.x, this.player.y);
     const full = this.shieldActive ? this.shieldMs / (sh.activeSeconds * 1000)
@@ -214,7 +215,8 @@ class CoinDash extends Phaser.Scene {
   /** Per-frame hooks, called only while `running`. `delta` is in milliseconds. */
   updateBoost(delta) {
     const b = COIN_DASH.boost;
-    const wanted = this.boostKeys.SPACE.isDown || this.boostKeys.SHIFT.isDown;
+    const blocked = this.shieldActive && !COIN_DASH.shield.allowBoost;
+    const wanted = !blocked && (this.boostKeys.SPACE.isDown || this.boostKeys.SHIFT.isDown);
     // Starting needs a minimum charge; once started it lasts until the bar is empty.
     if (!wanted) this.boosting = false;
     else if (!this.boosting && this.boostCharge >= b.minToStart) this.boosting = true;
