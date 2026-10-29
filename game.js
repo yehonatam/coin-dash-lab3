@@ -74,7 +74,36 @@ class CoinDash extends Phaser.Scene {
   addHudItem(fn) { this.hudItems.push(fn); }
 
   // ---- Feature hooks (empty here; each feature branch implements its own) --------------
-  setupStop() {}
+  setupStop() {
+    const c = COIN_DASH;
+    const s = c.stop;
+    // Dimmed overlay below the header strip, shown only while paused.
+    const overlay = this.add.container(0, 0).setDepth(s.depth).setVisible(false);
+    overlay.add([
+      this.add.rectangle(c.width / 2, 44 + (c.height - 44) / 2, c.width, c.height - 44, 0x0a1120, s.dimAlpha),
+      this.add.text(c.width / 2, c.height / 2, s.pausedText,
+        { font: '28px monospace', color: '#ffffff', align: 'center' }).setOrigin(0.5)
+    ]);
+    // Clickable button in the top-right of the HUD bar.
+    const bg = this.add.rectangle(s.buttonX, s.buttonY, s.buttonWidth, s.buttonHeight, s.buttonColor)
+      .setStrokeStyle(2, 0xffffff, 0.6).setDepth(s.depth + 1)
+      .setInteractive({ useHandCursor: true });
+    const label = this.add.text(s.buttonX, s.buttonY, s.stopLabel,
+      { font: '16px monospace', color: '#ffffff' }).setOrigin(0.5).setDepth(s.depth + 1);
+    const toggle = () => { if (!this.finished) this.togglePause(); };
+    bg.on('pointerdown', toggle);
+    bg.on('pointerover', () => bg.setFillStyle(s.buttonHoverColor));
+    bg.on('pointerout', () => bg.setFillStyle(s.buttonColor));
+    this.input.keyboard.on('keydown-P', toggle);
+    this.input.keyboard.on('keydown-ESC', toggle);
+    // The scene's event emitter survives scene.restart(), so unhook our listener on shutdown.
+    const onPauseChanged = (paused) => {
+      overlay.setVisible(paused);
+      label.setText(paused ? s.resumeLabel : s.stopLabel);
+    };
+    this.events.on('pause-changed', onPauseChanged);
+    this.events.once('shutdown', () => this.events.off('pause-changed', onPauseChanged));
+  }
 
   setupBoost() {}
 
