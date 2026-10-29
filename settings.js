@@ -25,7 +25,15 @@ window.COIN_DASH = {
   },
 
   // --- boost ---
-  boost: {},
+  boost: {
+    startCharge: 1,       // fraction of the bar filled at round start (0-1)
+    chargeSeconds: 8,     // time to refill from empty to full
+    drainSeconds: 2.5,    // time to drain from full to empty while boosting
+    minToStart: 0.2,      // charge fraction needed to begin a boost
+    speedMultiplier: 1.8,
+    barWidth: 140,
+    colors: { back: 0x24334b, fill: 0x71e8ce, active: 0xffd166, low: 0xff657a }
+  },
 
   // --- coin time bonus ---
   timeBonus: {},
